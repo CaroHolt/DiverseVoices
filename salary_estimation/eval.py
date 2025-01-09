@@ -232,7 +232,7 @@ def plot_results(diffs):
 
     plt.axvline(0, color='black', linewidth=0.8)  # Add a vertical line at x=0
     plt.tight_layout()
-    plt.savefig("/lustre/project/ki-topml/minbui/repos/DialectSalary/output/plot_image.png", dpi=300, bbox_inches='tight')  # Save as PNG with high resolution
+    plt.savefig("/lustre/project/ki-topml/minbui/repos/DialectSalary/salary_estimation/output/plot_image.png", dpi=300, bbox_inches='tight')  # Save as PNG with high resolution
 
 
 
@@ -270,7 +270,7 @@ def get_final_salary(data):
     data['average_salary'] = averages
     return data
 
-def main(input_file, verbose=0):
+def main(input_file, verbose=1):
     global OCCUPATIONS
     OCCUPATIONS_LANG = OCCUPATIONS["german"]
     # model, tokenizer = None, None
