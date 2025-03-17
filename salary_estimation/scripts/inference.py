@@ -2,11 +2,10 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import pandas as pd
 import argparse
-from prompts import set_prompts
 from tqdm import tqdm
 import os
 
-DEVICE = "cuda"
+DEVICE = "mps"
 MAX_NEW_TOKENS = 100
 
 LANGUAGES = ["german", "german_dia"]
@@ -17,7 +16,11 @@ def load_model(model_name):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token  # Option 1: Use eos_token as pad_token
     
-    model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16)
+    if DEVICE == "cuda":
+        model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16)
+        model.to(DEVICE)
     model.config.pad_token_id = model.config.eos_token_id
     logits_processor = None
     return model, tokenizer, logits_processor
@@ -26,6 +29,8 @@ def load_model(model_name):
 def tokenize_data(tokenizer, gt_file):
 
     all_prompts = set_prompts(gt_file)
+
+    all_prompts = all_prompts[:32] + all_prompts[-32:]
 
     prompts_template = []
     prompt_metadata = []
@@ -58,7 +63,7 @@ def set_prompts(gt_file):
 
 
 
-def batch_inference(input_texts, model, logits_processor, tokenizer, prompt_metadata, output_file, batch_size=64, num_return_sequences=1):
+def batch_inference(input_texts, model, logits_processor, tokenizer, prompt_metadata, output_file, batch_size=32, num_return_sequences=1):
     """
     Perform batch inference on a list of input texts:
 
@@ -151,12 +156,12 @@ def main(model_name, output_file, gt_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run inference on a dataset and save the results.")
-    parser.add_argument("--model_name", type=str, default="/lustre/project/ki-topml/kabecher/models/Meta-Llama-3.1-70B-Instruct",
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-0.5B-Instruct",
                         help="Name of the model to use for inference.")
     parser.add_argument("--output_folder", type=str,
-                        default="/lustre/project/ki-topml/minbui/repos/DialectSalary/salary_estimation/output", help="Path to the output CSV file.")
+                        default="salary_estimation/output", help="Path to the output CSV file.")
     parser.add_argument("--gt_file", type=str,
-                        default="/lustre/project/ki-topml/minbui/repos/DialectSalary/salary_estimation/data/prompts/adjective.csv", help="Path to the output CSV file.")
+                        default="salary_estimation/data/prompts/tasks/implicit_bias.csv", help="Path to the output CSV file.")
 
     args = parser.parse_args()
 
