@@ -2,56 +2,37 @@ import pandas as pd
 import os
 import random
 
+N_PROMPTS = 2
+
 
 ADJECTIVES = {
     "friendly": [
-        ["warm", "gracious", "nice", "amicable", "neighborly", "sweet", "merry",
-         "collegial", "cordial", "affectionate", "companionable", "warmhearted",
-         "chummy", "loving", "comradely", "genial", "hospitable"],
-        ["hostile", "negative", "adverse", "unfavorable", "inhospitable", "antagonistic",
-         "contentious", "unpleasant", "opposed", "adversarial", "inimical", "adversary",
-         "conflicting", "antipathetic", "unsympathetic", "jaundiced", "mortal",
-         "militant", "icy", "belligerent"]
+        ["warm", "gracious", "nice", "amicable", "neighborly", "sweet", "merry", "collegial", "cordial", "affectionate", "companionable", "warmhearted", "chummy", "loving", "comradely", "good-natured", "hospitable", "hearty", "approachable"],
+        ["unfriendly", "hostile", "negative", "adverse", "unfavorable", "inhospitable", "antagonistic", "contentious", "unpleasant", "opposed", "cold", "inimical", "heartless", "conflicting", "antipathetic", "unsympathetic", "rude", "mortal", "militant", "icy"]
     ],
     "educated": [
-        ["literate", "scholarly", "civilized", "cultured", "knowledgeable", "skilled", "informed", 
-         "learned", "instructed", "erudite", "lettered", "academical", "well-read", "academic", 
-         "cultivated", "schooled", "intellectual", "polished", "enlightened", "cerebral"],
-        ["ignorant", "inexperienced", "illiterate", "dark", "untutored", "unschooled", "untaught", 
-         "benighted", "unlearned", "simple", "unlettered", "uninstructed", "nonliterate", "innocent", 
-         "rude", "naive", "unread", "unknowledgeable", "uncultured", "naïve"]
+        ["literate", "scholarly", "civilized", "cultured", "knowledgeable", "skilled", "informed", "learned", "instructed", "erudite", "lettered", "academical", "well-read", "academic", "cultivated", "schooled", "intellectual", "polished", "enlightened"],
+        ["uneducated", "ignorant", "inexperienced", "illiterate", "dark", "untutored", "unschooled", "untaught", "benighted", "unlearned", "simple", "unlettered", "uninstructed", "nonliterate", "innocent", "stupid", "naive", "unread", "unknowledgeable", "uncultured"]
     ],
     "calm": [
-        ["quiet", "tranquil", "serene", "peaceful", "placid", "hushed", "still", "untroubled", "sunny", 
-         "gentle", "halcyon", "clear", "mild", "temperate", "lown", "equable", "moderate"],
-        ["moody", "volatile", "impulsive", "unstable", "changeful", "irritable", "mercurial", "unsettled", 
-         "uncertain", "variable", "capricious", "fickle", "whimsical", "changeable", "mutable", "inconstant", 
-         "fluctuating", "freakish", "sulky", "irascible"]
+        ["serene", "peaceful", "composed", "tranquil", "collected", "placid", "smooth", "unruffled", "undisturbed", "relaxed", "unperturbed", "steady", "nonchalant", "sedate", "cool", "coolheaded", "untroubled", "unshaken", "unworried"],
+        ["temperamental", "moody", "volatile", "impulsive", "unstable", "changeful", "irritable", "unsettled", "uncertain", "whimsical", "variable", "mercurial", "capricious", "sulky", "freakish", "fluctuating", "pouty", "changeable", "inconstant", "mutable"]
     ],
     "urban": [
-        ["metropolitan", "local", "regional", "metro", "communal", "national", "governmental", "civil", 
-         "municipal", "federal", "civic", "government", "public"],
-        ["pastoral", "rustical", "country", "rustic", "bucolic", "agrarian", "provincial", "agricultural", 
-         "backwoods", "countrified", "countryfied", "semirural", "nonurban", "backwoodsy"]
+        ["metropolitan", "metro", "communal", "national", "governmental", "civil", "municipal", "federal", "civic", "public", "cosmopolitan", "civilized", "cultured", "cultivated", "graceful", "experienced", "downtown", "nonfarm", "nonagricultural"],
+        ["rural", "pastoral", "rustical", "country", "rustic", "bucolic", "agrarian", "provincial", "agricultural", "backwoods", "countrified", "nonurban", "countryside", "semirural", "folksy", "down-home", "hokey", "corn-fed", "monocultural", "unsophisticated"]
     ],
     "religious": [
-        ["spiritual", "sacred", "liturgical", "devotional", "holy", "ritual", "solemn", "consecrated", "blest", 
-         "sacramental", "sacrosanct", "blessed", "sanctified", "hallowed", "semireligious", "semisacred"],
-        ["atheistic", "atheistical", "irreligious", "godless", "pagan", "religionless", "secular", "unchurched", 
-         "agnostic", "blasphemous", "irreverent", "churchless", "heathen", "sacrilegious", "impious", "ungodly", 
-         "unholy", "temporal", "worldly", "paganish"]
+        ["spiritual", "sacred", "liturgical", "devotional", "holy", "ritual", "solemn", "consecrated", "blest", "sacramental", "sacrosanct", "blessed", "sanctified", "hallowed", "semireligious", "semisacred", "devout", "saintly", "worshipful", "faithful"],
+        ["atheistic", "atheistical", "irreligious", "godless", "pagan", "religionless", "secular", "unchurched", "agnostic", "blasphemous", "irreverent", "churchless", "heathen", "sacrilegious", "impious", "ungodly", "unholy", "temporal", "worldly", "paganish"]
     ],
     "open_to_experience": [
-        ["philosophical", "curious", "artistic", "creative", "cultured", "reflective", "innovative", "sophisticated", 
-         "perceptive", "intelligent", "imaginative", "refined", "worldly", "cosmopolitan"],
-        ["imperceptive", "unreflective", "uninquisitive", "unimaginative", "uncreative", "uncultured", "unrefined", 
-         "unsophisticated", "shallow"],
+        ["philosophical", "curious", "artistic", "creative", "cultured", "reflective", "innovative", "sophisticated", "perceptive", "intelligent", "imaginative", "refined", "worldly", "cosmopolitan", "meditative", "inventive", "deep", "introspective", "complex", "open-minded"],
+        ["imperceptive", "unreflective", "uninquisitive", "uncreative", "uncultured", "unrefined", "unsophisticated", "shallow", "ordinary", "simple", "traditional", "predictable", "unimaginative", "uninnovative", "conventional", "old-fashioned", "unadventurous", "short-sighted", "dull", "narrow"]
     ],
     "conscientiousness": [
-        ["organized", "responsible", "reliable", "conscientious", "practical", "thorough", "hardworking", "thrifty", 
-         "cautious", "serious"],
-        ["disorganized", "irresponsible", "undependable", "negligent", "impractical", "careless", "lazy", "extravagant", 
-         "rash", "frivolous"]
+        ["orderly", "organized", "systematic", "concise", "exacting", "efficient", "responsible", "reliable", "perfectionistic", "precise", "conscientious", "practical", "thorough", "hardworking", "thrifty", "cautious", "serious", "disciplined", "punctual", "purposeful"],
+        ["disorganized", "inefficient", "unsystematic", "sloppy", "unreliable", "inconsistent", "unpredictable", "forgetful", "aimless", "unambitious", "indecisive", "irresponsible", "undependable", "negligent", "impractical", "careless", "lazy", "extravagant", "rash", "frivolous"]
     ]
 }
 
@@ -123,10 +104,16 @@ if __name__ == "__main__":
                 "text")].reset_index(drop=True)
             new_df = new_df[['id', 'language', 'standard_text', 'dialect_text']]
 
-            new_df["prompts"] = new_df.apply(lambda row: get_prompt(task, dimension), axis=1)
+            # Add multiple iterations
+            new_df["prompts"] = new_df.apply(
+                lambda row: [get_prompt(task, dimension) for _ in range(N_PROMPTS)], axis=1)
+            new_df = new_df.explode('prompts', ignore_index=True)
+
             new_df["writer_a"] = new_df.apply(lambda row: "standard" if "Writer A: '<STANDARD>" in row['prompts'] else ("dialect" if "Writer A: '<DIALECT>" in row['prompts'] else None), axis=1)
             new_df["prompts"] = new_df.apply(
                 lambda row: replace_prompt_with_content(row), axis=1)
+
+            # Add the prompts_iteration list as a new column
             new_df["task"] = dimension
 
             # new_df.to_csv(os.path.join(output_folder, task + "_" + dimension + ".csv"))

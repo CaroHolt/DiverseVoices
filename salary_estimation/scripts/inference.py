@@ -61,7 +61,7 @@ def set_prompts(gt_file):
 
 
 
-def batch_inference(input_texts, model, logits_processor, tokenizer, prompt_metadata, output_file, batch_size=16, num_return_sequences=1):
+def batch_inference(input_texts, model, logits_processor, tokenizer, prompt_metadata, output_file, batch_size=32, num_return_sequences=1):
     """
     Perform batch inference on a list of input texts:
 
