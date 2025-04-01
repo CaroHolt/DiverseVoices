@@ -1,12 +1,13 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, Gemma3ForConditionalGeneration
 import torch
 import pandas as pd
 import argparse
 from tqdm import tqdm
 import os
+import re
 
 DEVICE = "cuda"
-MAX_NEW_TOKENS = 100
+MAX_NEW_TOKENS = 320
 
 
 def load_model(model_name):
@@ -15,13 +16,15 @@ def load_model(model_name):
         tokenizer.pad_token = tokenizer.eos_token  # Option 1: Use eos_token as pad_token
     
     if DEVICE == "cuda":
-        model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16)
+        if "gemma-3" in model_name:
+            model = Gemma3ForConditionalGeneration.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16).eval()
+        else:
+            model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16).eval()
     else:
         model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16)
         model.to(DEVICE)
     model.config.pad_token_id = model.config.eos_token_id
-    logits_processor = None
-    return model, tokenizer, logits_processor
+    return model, tokenizer
 
 
 def tokenize_data(tokenizer, gt_file):
@@ -61,7 +64,7 @@ def set_prompts(gt_file):
 
 
 
-def batch_inference(input_texts, model, logits_processor, tokenizer, prompt_metadata, output_file, batch_size=32, num_return_sequences=1):
+def batch_inference(input_texts, model, tokenizer, prompt_metadata, output_file, batch_size=32, num_return_sequences=1):
     """
     Perform batch inference on a list of input texts:
 
@@ -122,7 +125,8 @@ def save_data(results, prompt_metadata, output_path):
     """
 
     split_texts = ["assistant\\n\\n", "assistant\\n",
-                  "assistant\n\n", "assistant\n", "assistant", "<|CHATBOT_TOKEN|>"]
+                  "assistant\n\n", "assistant\n", "assistant", "<|CHATBOT_TOKEN|>",
+                  "\nmodel\n"]
 
     answers = results
     for split_text in split_texts:
@@ -137,16 +141,16 @@ def save_data(results, prompt_metadata, output_path):
 
 # Main workflow
 def main(model_name, output_file, gt_file):
-
     # Step 0: Load the Model
-    model, tokenizer, logits_processor = load_model(model_name)
+    model, tokenizer = load_model(model_name)
 
     prompts, prompt_metadata = tokenize_data(tokenizer, gt_file)
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
     # Step 2: Perform inference
-    results = batch_inference(prompts, model, logits_processor, tokenizer, prompt_metadata, output_file)
+    #model_size = re.search(r'(\d+)b', s).group(1)
+    results = batch_inference(prompts, model, tokenizer, prompt_metadata, output_file)
 
     save_data(results, prompt_metadata, output_file)
 
