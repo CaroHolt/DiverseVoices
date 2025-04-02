@@ -53,7 +53,7 @@ def tokenize_data(tokenizer, file_path):
 def main(model_name, output_file, decision_folder):
     
     # Step 0: Load the Model
-    model, tokenizer, logits_processor = load_model(model_name)
+    model, tokenizer = load_model(model_name)
     #model, tokenizer, logits_processor = None, None, None
     for file in os.listdir(decision_folder):
         if file.endswith(".pkl"):
@@ -64,7 +64,7 @@ def main(model_name, output_file, decision_folder):
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
             # Step 2: Perform inference
-            results = batch_inference(prompts, model, logits_processor, tokenizer, prompt_metadata, output_file)
+            results = batch_inference(prompts, model, tokenizer, prompt_metadata, output_file)
 
             save_data(results, prompt_metadata, output_file)
 
@@ -75,9 +75,9 @@ if __name__ == "__main__":
     parser.add_argument("--model_name", type=str, default="/lustre/project/ki-topml/minbui/projects/models/gemma-3-12b-it",
                         help="Name of the model to use for inference.")
     parser.add_argument("--output_folder", type=str,
-                        default="salary_estimation/output/decision_extracted", help="Path to the output CSV file.")
+                        default="output/decision_extracted", help="Path to the output CSV file.")
     parser.add_argument("--decision_folder", type=str,
-                        default="salary_estimation/output/decision", help="Path to the output CSV file.")
+                        default="output/decision", help="Path to the output CSV file.")
 
     args = parser.parse_args()
 

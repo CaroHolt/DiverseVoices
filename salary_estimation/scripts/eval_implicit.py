@@ -144,7 +144,6 @@ def main(input_folder, output_folder, verbose=1):
             biases = []
             nones = []
             print("------{} ({})-----".format(model_name, dimension))
-            print(df_dimension)
             df_dimension["answer"] = df_dimension.apply(lambda row: row["answer"][0].split('\n'), axis=1)
             pos_adjectives = ADJECTIVES[dimension][0]
             neg_adjectives = ADJECTIVES[dimension][1]

@@ -109,8 +109,8 @@ def batch_inference(input_texts, model, tokenizer, prompt_metadata, output_file,
         decoded_outputs = [decoded_outputs[i:i+num_return_sequences] for i in range(0, len(decoded_outputs), num_return_sequences)]
         results += decoded_outputs
 
-        #if i % 10 == 0:
-        #    save_data(results, prompt_metadata, output_file)
+        if i % 30 == 0:
+            save_data(results, prompt_metadata, output_file)
 
     return results
 

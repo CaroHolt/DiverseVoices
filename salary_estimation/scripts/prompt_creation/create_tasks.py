@@ -5,8 +5,10 @@ import sys
 sys.path.append(os.getcwd())
 from scripts import ADJECTIVES, LANGUAGES, DECISIONS
 
-N_PROMPTS = 2
+N_PROMPTS = 1
 N_SAMPLES = 50
+TASKS = ["decision"]
+#TASKS = ["implicit", "implicit_explicit", "implicit_explicit_black"]
 # Per Task: N_PROMPTS * N_SAMPLES * N_DIALECTS
 # Per Task + Per Dialect: N_PROMPTS * N_SAMPLES
 
@@ -147,11 +149,8 @@ if __name__ == "__main__":
         dfs.append(df)
 
     df_texts = pd.concat(dfs)
-
-    #tasks = ["implicit", "implicit_explicit", "implicit_explicit_black"]
-    tasks = ["implicit"]
     
-    for task in tasks:
+    for task in TASKS:
         all_dfs = []
 
         for dimension in DIMENSIONS:
