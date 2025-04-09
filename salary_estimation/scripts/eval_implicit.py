@@ -187,9 +187,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run inference on a dataset and save the results.")
     parser.add_argument("--input_folder", type=str,
-                        default="/lustre/project/ki-topml/minbui/repos/DialectSalary/salary_estimation/output/implicit/", help="Path to the input CSV file.")
+                        default="output/implicit/", help="Path to the input CSV file.")
     parser.add_argument("--output_folder", type=str,
-                        default="/lustre/project/ki-topml/minbui/repos/DialectSalary/salary_estimation/output/implicit/eval", help="Path to the input CSV file.")
+                        default="output/implicit/eval", help="Path to the input CSV file.")
 
     args = parser.parse_args()
 

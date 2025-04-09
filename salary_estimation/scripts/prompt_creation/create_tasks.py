@@ -1,20 +1,11 @@
 import pandas as pd
 import os
 import random
+import argparse
 import sys
 sys.path.append(os.getcwd())
 from scripts import ADJECTIVES, LANGUAGES, DECISIONS
 
-N_PROMPTS = 1
-N_SAMPLES = 50
-TASKS = ["decision"]
-#TASKS = ["implicit", "implicit_explicit", "implicit_explicit_black"]
-# Per Task: N_PROMPTS * N_SAMPLES * N_DIALECTS
-# Per Task + Per Dialect: N_PROMPTS * N_SAMPLES
-
-
-DIMENSIONS = ["friendly", "educated", "calm", "urban", "open_to_experience", "conscientiousness"]
-#DIMENSIONS = ["open_to_experience"]
 
 def replace_prompt_with_content(row):
     prompt = row['prompts']
@@ -93,36 +84,6 @@ def explicit_setting(new_df, task):
     return new_df
 
 
-def load_df(input_file):
-    df_texts = pd.read_pickle(input_file)
-
-    # Add an ID column
-    df_texts["id"] = df_texts.index
-    df_texts["answer"] = df_texts.apply(
-        lambda row: row["answer"][0].replace("\n", " "), axis=1)
-
-    df_texts = df_texts.rename(
-        columns={'answer': 'standard_text', "contents": "dialect_text"})
-    # Transform the DataFrame
-    df_texts = df_texts.melt(id_vars=["id", "language"],
-                            value_vars=["standard_text", "dialect_text"],
-                            var_name="text_type",
-                            value_name="text")
-    return df_texts
-
-
-def create_df_copy(df_texts):
-    ds_size = len(df_texts) // 2
-    new_df = df_texts.iloc[:ds_size].copy()
-    new_df["standard_text"] = df_texts["text"]
-    new_df["dialect_text"] = df_texts.iloc[ds_size:, df_texts.columns.get_loc(
-        "text")].reset_index(drop=True)
-    new_df = new_df[['id', 'language', 'standard_text', 'dialect_text']]
-    # Explicit Setting
-    new_df = explicit_setting(new_df, task)
-    return new_df
-
-
 def categorize_writer_a(row):
     if "Writer A, who writes like this: '<STANDARD>" in row['prompts']:
         return "standard"
@@ -131,37 +92,53 @@ def categorize_writer_a(row):
     else:
         return None
     
-    
 
 if __name__ == "__main__":
-    output_folder = "data/prompts/tasks/"
-    input_file = "data/annotated_data"
+    parser = argparse.ArgumentParser(description="Process input and output files.")
+    parser.add_argument("--output_folder", type=str, default="data/prompts/tasks/", 
+                        help="Folder where output will be saved.")
+    parser.add_argument("--input_file", type=str, default="data/annotated_data", 
+                        help="Input file to be processed.")
 
+    # Additional parameters
+    parser.add_argument("--n_prompts", type=int, default=1, 
+                        help="Number of prompts to generate.")
+    parser.add_argument("--n_samples", type=int, default=50, 
+                        help="Number of samples to process.")
+    parser.add_argument("--tasks", type=str, nargs='+', default=["implicit", "decision"], 
+                        help="List of tasks to be processed (space-separated).")
+
+    # Per Task: N_PROMPTS * N_SAMPLES * N_DIALECTS
+    # Per Task + Per Dialect: N_PROMPTS * N_SAMPLES
+
+    args = parser.parse_args()
     # Create Dialect Data
     dfs = []
     for language in LANGUAGES:
-        df = pd.read_excel(os.path.join(input_file, language + ".xlsx"))
+        df = pd.read_excel(os.path.join(args.input_file, language + ".xlsx"))
         df["language"] = language
 
         # Subsample
-        df = df[:N_SAMPLES]
+        df = df[:args.n_samples]
 
         dfs.append(df)
 
     df_texts = pd.concat(dfs)
     
-    for task in TASKS:
+    for task in args.tasks:
         all_dfs = []
 
-        for dimension in DIMENSIONS:
+        if "implicit" in task:
+            dimensions = list(ADJECTIVES.keys())
+        elif "decision" in task:
+            dimensions = list(DECISIONS.keys())
+
+        for dimension in dimensions:
             new_df = df_texts.copy()
-            print("---------")
-            print(dimension)
             # Add multiple iterations
             new_df[["prompts", "concepts"]] = new_df.apply(
-                lambda row: get_prompt_and_concept_list(task, dimension, N_PROMPTS), axis=1
+                lambda row: get_prompt_and_concept_list(task, dimension, args.n_prompts), axis=1
             )
-            print(new_df["prompts"].iloc[-1])
             new_df = new_df.explode('prompts', ignore_index=True)
             new_df["writer_a"] = new_df.apply(categorize_writer_a, axis=1)
             new_df["prompts"] = new_df.apply(
@@ -171,6 +148,8 @@ if __name__ == "__main__":
             new_df["task"] = dimension
 
             all_dfs.append(new_df)
+            print("\n---------{}--------".format(dimension))
+            print("Example prompt:\n{}".format(new_df["prompts"].iloc[-1]))
 
         all_dfs = pd.concat(all_dfs)
-        all_dfs.to_csv(os.path.join(output_folder, task + ".csv"))
+        all_dfs.to_csv(os.path.join(args.output_folder, task + ".csv"))
