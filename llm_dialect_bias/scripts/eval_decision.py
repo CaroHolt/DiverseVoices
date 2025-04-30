@@ -119,9 +119,10 @@ if __name__ == "__main__":
         description="Run inference on a dataset and save the results.")
     parser.add_argument("--input_folder", type=str,
                         default="output/decision_extracted/", help="Path to the input CSV file.")
-    parser.add_argument("--output_folder", type=str,
-                        default="output/decision_extracted/eval", help="Path to the input CSV file.")
-
     args = parser.parse_args()
 
-    main(args.input_folder, args.output_folder)
+    output_folder = args.input_folder + 'eval/'
+
+    os.makedirs(os.path.dirname(output_folder), exist_ok=True)
+
+    main(args.input_folder, output_folder)

@@ -141,19 +141,17 @@ DIALECT_MAPPING = {
 
 MODELS = {
     # > 70B
-    "Meta-Llama-3.1-70B-Instruct.csv": "Llama-3.1-70B",
-    #"Llama-3.3-70B-Instruct.csv": "Llama-3.3-70B",
-    "Qwen2-72B-Instruct.csv": "Qwen2.5 72B",
-    "qwen_2.5_72b_chat.csv": "Qwen2.5 72B",
+    #"Meta-Llama-3.1-70B-Instruct.csv": "Llama-3.1-70B",
+    #´#"Llama-3.3-70B-Instruct.csv": "Llama-3.3-70B",
+    #"Qwen2.5-72B-Instruct.csv": "Qwen2.5-72B",
 
     # Medium
-    "c1df2547e1f5fe22e1f4897f980f231dc74cfc27.csv": "Aya 32b",
     "aya-expanse-32b.csv": "Aya 32b",
-    "gemma-3-12b-it.csv": "Gemma-3 12B",
-    "gemma-3-27b-it.csv": "Gemma-3 27B",
+   # "gemma-3-12b-it.csv": "Gemma-3 12B",
+    #"gemma-3-27b-it.csv": "Gemma-3 27B",
 
     # Small
-    "0e9e39f249a16976918f6564b8830bc894c89659.csv": "Llama-3.1-8B",
-    "bb46c15ee4bb56c5b63245ef50fd7637234d6f75.csv": "Qwen2.5 8B",
-    "e46040a1bebe4f32f4d2f04b0a5b3af2c523d11b.csv": "Aya 8B",
+   # "Meta-Llama-3.1-8B-Instruct.csv": "Llama-3.1-8B",
+    #"Qwen2.5-7B-Instruct.csv": "Qwen2.5-7B",
+    #"aya-expanse-8b.csv": "Aya 8B",
 }

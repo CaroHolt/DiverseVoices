@@ -3,6 +3,10 @@ import os
 import random
 import argparse
 import sys
+
+import string
+import Levenshtein
+
 sys.path.append(os.getcwd())
 from scripts import ADJECTIVES, LANGUAGES, DECISIONS
 
@@ -84,13 +88,59 @@ def explicit_setting(new_df, task):
     return new_df
 
 
-def categorize_writer_a(row):
+def categorize_writer_a(row, robustness):
     if "Writer A, who writes like this: '<STANDARD>" in row['prompts']:
         return "standard"
     elif "Writer A, who writes like this: '<DIALECT>" in row['prompts']:
-        return "dialect"
+        if robustness != 0:
+            return "typos"
+        else:
+            return "dialect"
     else:
         return None
+
+def corrupt_text(row, common_words, word_corrupt_prob=0.25):
+    original_text = row['translation'].split()
+    corrupted = []
+
+    for word in original_text:
+        if random.random() < word_corrupt_prob:
+            # Decide whether to do word-level or character-level modification
+            if random.random() < 0.5:
+                # Word-level modification
+                op = random.choice(["insert", "substitute", "delete"])
+                if op == "insert":
+                    random_word = random.choice(common_words)
+                    corrupted.append(word)
+                    corrupted.append(random_word)
+                elif op == "substitute":
+                    random_word = random.choice(common_words)
+                    corrupted.append(random_word)
+                elif op == "delete":
+                    continue  # Skip this word (delete)
+            else:
+                # Character-level modification
+                op = random.choice(["insert_char", "substitute_char", "delete_char"])
+                if len(word) > 0:
+                    idx = random.randint(0, len(word) - 1)
+                    if op == "insert_char":
+                        random_char = chr(random.randint(97, 122))  # random lowercase letter
+                        word = word[:idx] + random_char + word[idx:]
+                    elif op == "substitute_char":
+                        random_char = chr(random.randint(97, 122))
+                        word = word[:idx] + random_char + word[idx+1:]
+                    elif op == "delete_char" and len(word) > 1:
+                        word = word[:idx] + word[idx+1:]
+                    corrupted.append(word)
+                else:
+                    corrupted.append(word)
+        else:
+            # No corruption, keep word
+            corrupted.append(word)
+
+    return ' '.join(corrupted)
+
+
     
 
 if __name__ == "__main__":
@@ -107,6 +157,9 @@ if __name__ == "__main__":
                         help="Number of samples to process.")
     parser.add_argument("--tasks", type=str, nargs='+', default=["implicit", "decision"], 
                         help="List of tasks to be processed (space-separated).")
+    parser.add_argument("--robustness", type=bool, default=False, 
+                        help="Whether a robustness check should be carried out.")
+
 
     # Per Task: N_PROMPTS * N_SAMPLES * N_DIALECTS
     # Per Task + Per Dialect: N_PROMPTS * N_SAMPLES
@@ -117,6 +170,12 @@ if __name__ == "__main__":
     for language in LANGUAGES:
         df = pd.read_excel(os.path.join(args.input_file, language + ".xlsx"))
         df["language"] = language
+        if args.robustness:
+            df['dialect_original'] = df['dialect']
+            word_corrupt_prob = 0.33
+            with open('data/deu_news_2024_10K-words_cleaned_5000.txt', 'r', encoding='utf-8') as f:
+                common_words = [line.strip() for line in f if line.strip()]
+            df['dialect'] = df.apply(lambda row: corrupt_text(row, common_words, word_corrupt_prob), axis=1)
 
         # Subsample
         df = df[:args.n_samples]
@@ -127,6 +186,9 @@ if __name__ == "__main__":
     
     for task in args.tasks:
         all_dfs = []
+        if 'implicit_explicit' in task:
+            df_texts["translation"] = "Writes in standard German."
+            df_texts["dialect"] = "Writes in dialect German."
 
         if "implicit" in task:
             dimensions = list(ADJECTIVES.keys())
@@ -140,7 +202,7 @@ if __name__ == "__main__":
                 lambda row: get_prompt_and_concept_list(task, dimension, args.n_prompts), axis=1
             )
             new_df = new_df.explode('prompts', ignore_index=True)
-            new_df["writer_a"] = new_df.apply(categorize_writer_a, axis=1)
+            new_df["writer_a"] = new_df.apply(lambda row: categorize_writer_a(row, args.robustness), axis=1)
             new_df["prompts"] = new_df.apply(
                 lambda row: replace_prompt_with_content(row), axis=1)
 
@@ -151,5 +213,10 @@ if __name__ == "__main__":
             print("\n---------{}--------".format(dimension))
             print("Example prompt:\n{}".format(new_df["prompts"].iloc[-1]))
 
+
         all_dfs = pd.concat(all_dfs)
-        all_dfs.to_csv(os.path.join(args.output_folder, task + ".csv"))
+        output_file = task
+        if args.robustness:
+            output_file= output_file + '_robustness_' + str(word_corrupt_prob)
+        
+        all_dfs.to_csv(os.path.join(args.output_folder, output_file + ".csv"))

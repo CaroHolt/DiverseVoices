@@ -65,7 +65,7 @@ def main(model_name, output_file, decision_folder):
 
             # Step 2: Perform inference
             results = batch_inference(prompts, model, tokenizer, prompt_metadata, output_file)
-
+            
             save_data(results, prompt_metadata, output_file)
 
 

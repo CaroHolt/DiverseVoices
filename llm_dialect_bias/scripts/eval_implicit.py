@@ -30,15 +30,20 @@ def check_parsing(pair, writer_raw, word, pos_adjectives, neg_adjectives):
 
 
 def parse_pair(pair, pos_adjectives, neg_adjectives, writer_a):
-    pair = pair.lower()
+    pair = pair.lower().replace('human:', '')
     splitted = pair.split(":")
     word = splitted[0].strip().lower()
     if len(splitted) > 1:
-        writer_raw = ":".join(splitted[1:])
-        writer_raw = writer_raw.replace("writer", "").strip()
+        if word not in pos_adjectives and word not in neg_adjectives:
+            word = splitted[1].strip().lower()
+            writer_raw = splitted[0].strip().lower()
+        else:
+            writer_raw = ":".join(splitted[1:])
+        writer_raw = writer_raw.replace("writer", "").replace("write", "").strip()
         writer_raw = writer_raw.replace(":", "").strip().lower().split(" ")[0]
     else:
         writer_raw = "wrong"
+
 
     # Check correct parsing
     correct_parsed = check_parsing(pair, writer_raw, word, pos_adjectives, neg_adjectives)
@@ -126,15 +131,20 @@ def main(input_folder, output_folder, verbose=1):
         "bias": [],
         "model_name": [],
         "dimension": [],
-        "nones": []
+        "nones": [],
+        "language": []
     }
 
     for file, model_name in MODELS.items():
+        print(model_name)
+        print(file)
         input_file = os.path.join(input_folder, file)
         if not os.path.exists(input_file):
             continue
         input_file = input_file.replace(".csv", ".pkl")    
         df = pd.read_pickle(input_file)
+
+        print(df.head())
 
         for dimension in DIMENSIONS:
 
@@ -147,6 +157,8 @@ def main(input_folder, output_folder, verbose=1):
             df_dimension["answer"] = df_dimension.apply(lambda row: row["answer"][0].split('\n'), axis=1)
             pos_adjectives = ADJECTIVES[dimension][0]
             neg_adjectives = ADJECTIVES[dimension][1]
+            print(pos_adjectives)
+            print(neg_adjectives)
             for index, row in df_dimension.iterrows():
                 bias_counts = init_count()
                 bias = None
@@ -173,6 +185,7 @@ def main(input_folder, output_folder, verbose=1):
             final_df["nones"] += nones
             final_df["model_name"] += [model_name] * len(biases)
             final_df["dimension"] += [dimension] * len(biases)
+            final_df["language"] += list(df_dimension["language"])
 
             print("Final Result for {} ({})".format(model_name, dimension))
             print(counts)
@@ -188,9 +201,11 @@ if __name__ == "__main__":
         description="Run inference on a dataset and save the results.")
     parser.add_argument("--input_folder", type=str,
                         default="output/implicit/", help="Path to the input CSV file.")
-    parser.add_argument("--output_folder", type=str,
-                        default="output/implicit/eval", help="Path to the input CSV file.")
 
     args = parser.parse_args()
 
-    main(args.input_folder, args.output_folder)
+    output_folder = args.input_folder + 'eval/'
+
+    os.makedirs(os.path.dirname(output_folder), exist_ok=True)
+
+    main(args.input_folder, output_folder)

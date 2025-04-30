@@ -1,16 +1,10 @@
 #!/bin/bash
-#SBATCH --partition=a100ai
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=5
-#SBATCH --gres=gpu:3
-#SBATCH --time=24:00:00
-#SBATCH --mem=50gb
-#SBATCH --output=/lustre/project/ki-topml/minbui/repos/DialectSalary/salary_estimation/sh/output/test_%j.log
+# to surpress annoyingly verbose warning
+export TOKENIZERS_PARALLELISM=true
+export CUDA_VISIBLE_DEVICES=0,1,3
+export HF_HOME="/work/bbc6523/cache_dir"
 
 
-# Activate conda env
-source /lustre/project/ki-topml/minbui/.bashrc
-conda_initialize
-micromamba activate audio
 
-python /lustre/project/ki-topml/minbui/repos/DialectSalary/salary_estimation/scripts/extract_decision.py
+#python scripts/extract_decision.py --model google/gemma-3-12b-it
+python scripts/parse_decision_story.py --model google/gemma-3-12b-it
