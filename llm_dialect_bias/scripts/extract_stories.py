@@ -67,8 +67,8 @@ def parse_writer_story(row):
         if writer_b:
             writer_b_text = writer_b.group(1).strip()
 
-    writer_a_text = writer_a_text.replace('\\n', '').replace('*', '').replace('  ', ' ').lower()
-    writer_b_text = writer_b_text.replace('\\n', '').replace('*', '').replace('  ', ' ').lower()
+    writer_a_text = writer_a_text.replace('\\n', ' ').replace('*', '').replace('  ', ' ').lower()
+    writer_b_text = writer_b_text.replace('\\n', ' ').replace('*', '').replace('  ', ' ').lower()
 
     return pd.Series([writer_a_text, writer_b_text, story_text])
 
@@ -101,7 +101,7 @@ def main():
             empty_stories = len(df[df['Story A'] == '']) + len(df[df['Story B'] == ''])
             print('Length of dataset: ' + str(len(df)))
             print('Non processed texts = ' + str(empty_stories))
-            df['dimension'] = df['task'][:-2]
+            df['dimension'] = df['task'].str[:-2]
 
             # Create random stories
            # if 'Llama' in file: 

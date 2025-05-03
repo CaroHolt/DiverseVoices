@@ -155,7 +155,7 @@ if __name__ == "__main__":
                         help="Number of prompts to generate.")
     parser.add_argument("--n_samples", type=int, default=50, 
                         help="Number of samples to process.")
-    parser.add_argument("--tasks", type=str, nargs='+', default=["implicit", "decision"], 
+    parser.add_argument("--tasks", type=str, nargs='+', default=["implicit", "decision", "implicit_explicit"], 
                         help="List of tasks to be processed (space-separated).")
     parser.add_argument("--robustness", type=bool, default=False, 
                         help="Whether a robustness check should be carried out.")
@@ -172,12 +172,13 @@ if __name__ == "__main__":
         df["language"] = language
         if args.robustness:
             df['dialect_original'] = df['dialect']
-            word_corrupt_prob = 0.33
+            word_corrupt_prob = 0.25
             with open('data/deu_news_2024_10K-words_cleaned_5000.txt', 'r', encoding='utf-8') as f:
                 common_words = [line.strip() for line in f if line.strip()]
             df['dialect'] = df.apply(lambda row: corrupt_text(row, common_words, word_corrupt_prob), axis=1)
 
         # Subsample
+        df = df[df['Keep'] != 'No']
         df = df[:args.n_samples]
 
         dfs.append(df)

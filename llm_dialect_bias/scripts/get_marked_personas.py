@@ -70,7 +70,7 @@ def get_log_odds(df1, df2, df0,verbose=False,lower=True):
 
 
 
-def marked_words(df_dimension, rest_texts,verbose=False):
+def marked_words_dialect(df_dimension, rest_texts,verbose=False):
 
     """Get words that distinguish the target group (which is defined as having 
     target_group_vals in the target_group_cols column of the dataframe) 
@@ -121,6 +121,57 @@ def marked_words(df_dimension, rest_texts,verbose=False):
         grams_refine[r] = temp
     return grams_refine['target']
 
+def marked_words_standard(df_dimension, rest_texts,verbose=False):
+
+    """Get words that distinguish the target group (which is defined as having 
+    target_group_vals in the target_group_cols column of the dataframe) 
+    from all unmarked_attrs (list of values that correspond to the categories 
+    in unmarked_attrs)"""
+
+    grams = dict()
+    thr = 1.96 #z-score threshold
+
+    for task in df_dimension.task.unique():
+
+        subset = df_dimension[df_dimension['task'] == task]
+
+        dialect_texts = pd.concat([subset[subset['writer_a'] == 'standard']['Story B'], subset[subset['writer_a'] != 'standard']['Story A']])
+        standard_texts = pd.concat([subset[subset['writer_a'] == 'standard']['Story A'], subset[subset['writer_a'] != 'standard']['Story B']])
+        
+
+        delt = get_log_odds(standard_texts, dialect_texts, rest_texts, verbose) #first one is the positive-valued one
+
+        c1 = []
+        c2 = []
+        for k,v in delt.items():
+            if v > thr:
+                c1.append([k,v])
+            elif v < -thr:
+                c2.append([k,v])
+        
+
+        if 'target' in grams:
+            grams['target'].extend(c1)
+        else:
+            grams['target'] = c1
+        if task in grams:
+            grams[task].extend(c2)
+        else:
+            grams[task] = c2
+    grams_refine = dict()
+    
+
+    for r in grams.keys():
+        temp = []
+        thr = len(df_dimension.task.unique()) 
+        for k,v in Counter([word for word, z in grams[r]]).most_common():
+            if v >= thr:
+                z_score_sum = np.sum([z for word, z in grams[r] if word == k])
+                temp.append([k, z_score_sum])
+
+        grams_refine[r] = temp
+    return grams_refine['target']
+
 
 def main():
     parser = argparse.ArgumentParser(description="Just an example",
@@ -139,23 +190,44 @@ def main():
 
     args = parser.parse_args()
 
+    rows = []
     for file in os.listdir(args.decision_folder):
-        print('****************************')
-        print(file)
+        if file != 'eval':
+            print('****************************')
+            print(file)
 
-        df = pd.read_csv(args.decision_folder + file)
-        #Filter out empty cells for both dialect and standard
-        df = df[(~df['Story A'].isnull()) & (~df['Story B'].isnull())]
-        df = df[~df['dimension'].isnull()]
+            df = pd.read_csv(args.decision_folder + file)
+            #Filter out empty cells for both dialect and standard
+            df = df[(~df['Story A'].isnull()) & (~df['Story B'].isnull())]
+            print(len(df))
+            df = df[~df['dimension'].isnull()]
+            print(len(df))
 
-        for dimension in df.dimension.unique():
-            print(dimension)
-            subset = df[df['dimension'] == dimension].copy()
-            rest_texts = df[df['dimension'] != dimension]['Story A']
-        
-            top_words = marked_words(subset, rest_texts,verbose=args.verbose)
-            print("Top words:")
-            print(top_words)
+            for task in df.task.unique():
+                print(task)
+                subset = df[df['task'] == task].copy()
+                rest_texts = df[df['task'] != task]['Story A']
+            
+                top_words = marked_words_dialect(subset, rest_texts,verbose=args.verbose)
+                print("Top words:")
+                print(top_words)
+                for word, value in top_words:
+                    rows.append(['dialect', file[:-4] , task, word, float(value)])
+                
+                top_words = marked_words_standard(subset, rest_texts,verbose=args.verbose)
+                print("Top words:")
+                print(top_words)
+                for word, value in top_words:
+                    rows.append(['standard', file[:-4] , task, word, float(value)])
+
+    df_results = pd.DataFrame(rows, columns=["Target Group", "Model" , "Task", "Word", "Value"])
+    os.makedirs(os.path.dirname(args.decision_folder + 'eval/'), exist_ok=True)
+    df_results['Value'] = df_results['Value'].round(2)
+    df_results = df_results.sort_values(by=['Target Group', 'Model','Task','Value'], ascending=False)
+    df_results['Word+Value'] = df_results['Word'] + ' (' + df_results['Value'].astype(str) + '), '
+    df_results.to_csv(args.decision_folder + 'eval/results.csv' , index=False)
+    grouped = df_results.groupby(["Target Group", "Model" , "Task"])['Word+Value'].sum().reset_index()
+    grouped.to_csv(args.decision_folder + 'eval/results_grouped.csv' , index=False)
 
 if __name__ == '__main__':
     
