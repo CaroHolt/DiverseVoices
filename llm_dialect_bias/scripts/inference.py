@@ -20,7 +20,6 @@ def load_model(model_name):
         if "gemma-3" in model_name:
             model = Gemma3ForConditionalGeneration.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16).eval()
         else:
-            print('HELLO')
             model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16, trust_remote_code=True).eval()
             #model.to(DEVICE)
     else:
