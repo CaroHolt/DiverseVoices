@@ -5,6 +5,8 @@ import sys
 sys.path.append(os.getcwd())
 from scripts import LANGUAGES
 
+LANGUAGES = ["nds"]
+
 original_dir = "data/selected_data/manually_checked_data"
 input_file = "data/selected_data/gpt_4o_batch/translation_batch_output.jsonl"
 output_dir = "data/selected_data/data_to_annotate"
@@ -50,9 +52,9 @@ with open(input_file, "r", encoding="utf-8") as file:
 for language in LANGUAGES:
     # Load raw
     df_raw = pd.read_csv(os.path.join(original_dir, language + ".csv"))
-    df_raw["Filter"] = pd.to_numeric(df_raw["Filter"], errors='coerce').astype('Int64')
+    #df_raw["Filter"] = pd.to_numeric(df_raw["Filter"], errors='coerce').astype('Int64')
 
-    df_raw = df_raw[df_raw["Filter"] == 1]
+    #df_raw = df_raw[df_raw["Filter"] == 1]
     df_lang = df[df["language"] == language].copy()
     df_raw["id"] = df_raw["id"].astype(int) 
     df_lang["id"] = df_lang["id"].astype(int)

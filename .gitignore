@@ -1,5 +1,6 @@
 # custom
 salary_estimation/output
+salary_estimation/data/wikidir
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

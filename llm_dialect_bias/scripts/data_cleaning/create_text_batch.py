@@ -7,6 +7,8 @@ from scripts.inference import load_model, tokenize_data, batch_inference, save_d
 from scripts import LANGUAGES
 import json
 
+LANGUAGES = ["nds"]
+
 input_dir = "data/selected_data/manually_checked_data"
 output_dir = "data/selected_data/gpt_4o_batch"
 
@@ -37,8 +39,8 @@ json_lines = []
 for language in LANGUAGES:
     file = os.path.join(input_dir, language + ".csv")
     df = pd.read_csv(file)
-    df["Filter"] = pd.to_numeric(df["Filter"], errors='coerce').astype('Int64')
-    df = df[df["Filter"] == 1]
+    #df["Filter"] = pd.to_numeric(df["Filter"], errors='coerce').astype('Int64')
+    #df = df[df["Filter"] == 1]
 
     df["prompts"] = df.apply(lambda row: fill_prompt(prompt_raw, row["contents"], dialect_mapping[language]), axis=1)
     for index, row in df.iterrows():

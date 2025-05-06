@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM, Gemma3ForConditionalGeneration, LogitsProcessorList
+from transformers import AutoTokenizer, AutoModelForCausalLM, Gemma3ForConditionalGeneration
 import torch
 import pandas as pd
 import argparse
@@ -6,28 +6,24 @@ from tqdm import tqdm
 import os
 import re
 
-
 DEVICE = "cuda"
 MAX_NEW_TOKENS = 320
 
 
 def load_model(model_name):
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, padding_side='left')
+    tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side='left')
     if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
+        tokenizer.pad_token = tokenizer.eos_token  # Option 1: Use eos_token as pad_token
+    
     if DEVICE == "cuda":
         if "gemma-3" in model_name:
-            model = Gemma3ForConditionalGeneration.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16).eval()
+            model = Gemma3ForConditionalGeneration.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16).eval()
         else:
-            print('HELLO')
-            model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16, trust_remote_code=True).eval()
-            #model.to(DEVICE)
+            model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16).eval()
     else:
-        print('HI')
-        model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
+        model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16)
         model.to(DEVICE)
-    model.config.pad_token_id = tokenizer.eos_token_id
+    model.config.pad_token_id = model.config.eos_token_id
     return model, tokenizer
 
 
@@ -44,6 +40,7 @@ def tokenize_data(tokenizer, gt_file):
             prompt[0], add_generation_prompt=True, tokenize=False)
         prompts_template.append(messages)
         prompt_metadata.append(prompt[1])
+    # print(prompts_template[:2])
     return prompts_template, prompt_metadata
 
 
@@ -89,14 +86,13 @@ def batch_inference(input_texts, model, tokenizer, prompt_metadata, output_file,
 
         # Tokenize and pad inputs for batch processing
         inputs = tokenizer(batch_texts, return_tensors="pt",
-                           padding=True, truncation=True).to(DEVICE)
-        
+                           padding=True, truncation=True, pad_to_multiple_of=8).to(DEVICE)
 
         # Generate predictions
         with torch.no_grad():
             outputs = model.generate(
-                **inputs,
-                #attention_mask=inputs["attention_mask"],
+                inputs["input_ids"],
+                attention_mask=inputs["attention_mask"],
                 max_new_tokens=MAX_NEW_TOKENS,
                 num_return_sequences=num_return_sequences,
                 pad_token_id=tokenizer.eos_token_id,  # Ensure padding if needed,
@@ -106,8 +102,6 @@ def batch_inference(input_texts, model, tokenizer, prompt_metadata, output_file,
                 top_p=0.9,
                 #logits_processor=logits_processor
             )
-
-
 
         # Decode the predictions and append to results
         decoded_outputs = [tokenizer.decode(
@@ -174,8 +168,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model_name = args.model_name.split("/")[-1]
-    print(model_name)
-    print(args.gt_file)
     output_file = os.path.join(args.output_folder, model_name + ".csv")
 
     main(args.model_name, output_file, args.gt_file)
