@@ -151,7 +151,7 @@ MODELS = {
     #"gemma-3-27b-it.csv": "Gemma-3 27B",
 
     # Small
-   # "Meta-Llama-3.1-8B-Instruct.csv": "Llama-3.1-8B",
-    #"Qwen2.5-7B-Instruct.csv": "Qwen2.5-7B",
-    #"aya-expanse-8b.csv": "Aya 8B",
+    "Meta-Llama-3.1-8B-Instruct.csv": "Llama-3.1-8B",
+    "Qwen2.5-7B-Instruct.csv": "Qwen2.5-7B",
+    "aya-expanse-8b.csv": "Aya 8B",
 }

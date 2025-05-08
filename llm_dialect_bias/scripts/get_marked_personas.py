@@ -233,11 +233,3 @@ if __name__ == '__main__':
     
     main()
 
-
-
-    """
-Running this file obtains the words that distinguish a target group from the corresponding
-unmarked ones.
-Example usage: (To obtain the words that differentiate the 'Asian F' category)
-python3 marked_words.py ../generated_personas.csv --target_val 'an Asian' F --target_col race gender --unmarked_val 'a White' M
-"""

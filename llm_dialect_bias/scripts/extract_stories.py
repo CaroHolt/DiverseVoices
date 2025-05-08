@@ -103,24 +103,6 @@ def main():
             print('Non processed texts = ' + str(empty_stories))
             df['dimension'] = df['task'].str[:-2]
 
-            # Create random stories
-           # if 'Llama' in file: 
-           #     model_name = 'meta-llama/' + file[:-4]
-           # elif 'Qwen' in file: 
-           #     model_name = 'Qwen/' + file[:-4]
-           # else:
-           #     raise ValueError('no suitable model')#
-
-           # model, tokenizer = load_model(model_name)
-
-           # all_prompts = []
-
-             #   messages = [{"role": "user", "content": ""}]
-
-
-                #all_prompts.append(
-                #    [messages, metadata])
-
 
             os.makedirs(os.path.dirname(args.output_folder), exist_ok=True)
             df.to_csv(args.output_folder + file, index=False)

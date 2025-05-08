@@ -8,7 +8,7 @@ import re
 
 
 DEVICE = "cuda"
-MAX_NEW_TOKENS = 320
+MAX_NEW_TOKENS = 1024
 
 
 def load_model(model_name):
@@ -18,7 +18,8 @@ def load_model(model_name):
 
     if DEVICE == "cuda":
         if "gemma-3" in model_name:
-            model = Gemma3ForConditionalGeneration.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16).eval()
+            model = Gemma3ForConditionalGeneration.from_pretrained(model_name, device_map="auto", torch_dtype=torch.bfloat16).eval()
+            #model.to(DEVICE)
         else:
             model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16, trust_remote_code=True).eval()
             #model.to(DEVICE)

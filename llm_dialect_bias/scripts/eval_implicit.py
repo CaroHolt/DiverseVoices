@@ -137,14 +137,11 @@ def main(input_folder, output_folder, verbose=1):
 
     for file, model_name in MODELS.items():
         print(model_name)
-        print(file)
         input_file = os.path.join(input_folder, file)
         if not os.path.exists(input_file):
             continue
         input_file = input_file.replace(".csv", ".pkl")    
         df = pd.read_pickle(input_file)
-
-        print(df.head())
 
         for dimension in DIMENSIONS:
 
