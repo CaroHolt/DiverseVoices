@@ -141,14 +141,14 @@ DIALECT_MAPPING = {
 
 MODELS = {
     # > 70B
-    #"Meta-Llama-3.1-70B-Instruct.csv": "Llama-3.1-70B",
+    "Meta-Llama-3.1-70B-Instruct.csv": "Llama-3.1-70B",
     #´#"Llama-3.3-70B-Instruct.csv": "Llama-3.3-70B",
-    #"Qwen2.5-72B-Instruct.csv": "Qwen2.5-72B",
+    "qwen2.5_72b_chat.csv": "Qwen2.5-72B",
 
     # Medium
     "aya-expanse-32b.csv": "Aya 32b",
-   # "gemma-3-12b-it.csv": "Gemma-3 12B",
-    #"gemma-3-27b-it.csv": "Gemma-3 27B",
+    "gemma-3-12b-it.csv": "Gemma-3 12B",
+    "gemma-3-27b-it.csv": "Gemma-3 27B",
 
     # Small
     "Meta-Llama-3.1-8B-Instruct.csv": "Llama-3.1-8B",

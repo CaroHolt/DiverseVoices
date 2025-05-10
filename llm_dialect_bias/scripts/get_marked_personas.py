@@ -186,6 +186,7 @@ def main():
     parser.add_argument("--unmarked_val", nargs="*",
     type=str,
     default=[''],help="List of unmarked default values for relevant demographic categories")
+    parser.add_argument("--per_lang", default=False, type=bool, help="Do generate per dialect")
     parser.add_argument("--verbose", action='store_true',help="If set to true, prints out top words calculated by Fightin' Words")
 
     args = parser.parse_args()
@@ -197,30 +198,57 @@ def main():
             print(file)
 
             df = pd.read_csv(args.decision_folder + file)
+
             #Filter out empty cells for both dialect and standard
             df = df[(~df['Story A'].isnull()) & (~df['Story B'].isnull())]
-            print(len(df))
             df = df[~df['dimension'].isnull()]
-            print(len(df))
 
-            for task in df.task.unique():
-                print(task)
-                subset = df[df['task'] == task].copy()
-                rest_texts = df[df['task'] != task]['Story A']
+            if args.per_lang:
             
-                top_words = marked_words_dialect(subset, rest_texts,verbose=args.verbose)
-                print("Top words:")
-                print(top_words)
-                for word, value in top_words:
-                    rows.append(['dialect', file[:-4] , task, word, float(value)])
-                
-                top_words = marked_words_standard(subset, rest_texts,verbose=args.verbose)
-                print("Top words:")
-                print(top_words)
-                for word, value in top_words:
-                    rows.append(['standard', file[:-4] , task, word, float(value)])
+                for dialect in df.language.unique():
+                    
+                    subset_dialect = df[df['language'] == dialect]
 
-    df_results = pd.DataFrame(rows, columns=["Target Group", "Model" , "Task", "Word", "Value"])
+                    for task in subset_dialect.task.unique():
+                        print(task)
+                        subset = subset_dialect[subset_dialect['task'] == task].copy()
+                        rest_texts = pd.concat([subset_dialect['Story A'],subset_dialect['Story B']])
+                    
+                        top_words = marked_words_dialect(subset, rest_texts,verbose=args.verbose)
+                        print("Top words:")
+                        print(top_words)
+                        for word, value in top_words:
+                            rows.append(['dialect', file[:-4] , task, word, float(value), dialect])
+                        
+                        top_words = marked_words_standard(subset, rest_texts,verbose=args.verbose)
+                        print("Top words:")
+                        print(top_words)
+                        for word, value in top_words:
+                            rows.append(['standard', file[:-4] , task, word, float(value), dialect])
+            
+            else:
+
+                for task in df.task.unique():
+                    print(task)
+                    subset = df[df['task'] == task].copy()
+                    rest_texts = pd.concat([df['Story A'],df['Story B']])
+                
+                    top_words = marked_words_dialect(subset, rest_texts,verbose=args.verbose)
+                    print("Top words:")
+                    print(top_words)
+                    for word, value in top_words:
+                        rows.append(['dialect', file[:-4] , task, word, float(value)])
+                    
+                    top_words = marked_words_standard(subset, rest_texts,verbose=args.verbose)
+                    print("Top words:")
+                    print(top_words)
+                    for word, value in top_words:
+                        rows.append(['standard', file[:-4] , task, word, float(value)])
+
+    if args.per_lang:
+        df_results = pd.DataFrame(rows, columns=["Target Group", "Model" , "Task", "Word", "Value", "Dialect"])
+    else:
+        df_results = pd.DataFrame(rows, columns=["Target Group", "Model" , "Task", "Word", "Value"])
     os.makedirs(os.path.dirname(args.decision_folder + 'eval/'), exist_ok=True)
     df_results['Value'] = df_results['Value'].round(2)
     df_results = df_results.sort_values(by=['Target Group', 'Model','Task','Value'], ascending=False)
