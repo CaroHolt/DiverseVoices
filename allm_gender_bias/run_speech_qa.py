@@ -1,5 +1,5 @@
 from datasets import load_dataset
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, Qwen2AudioForConditionalGeneration, AutoTokenizer, AutoModelForCausalLM#, Qwen2_5OmniModel
+from transformers import AutoModel, AutoModelForSpeechSeq2Seq, AutoProcessor, Qwen2AudioForConditionalGeneration, AutoTokenizer, AutoModelForCausalLM#, Qwen2_5OmniModel
 import pandas as pd
 import librosa
 import torch
@@ -59,7 +59,7 @@ def load_model(model_name_or_path, cache_dir, load_in_8bit):
             trust_remote_code=True,
             cache_dir = cache_dir
         )
-        tokenizer = AutoTokenizer.from_pretrained(
+        processor = AutoTokenizer.from_pretrained(
             model_name_or_path, trust_remote_code=True
         )
     else: 
@@ -140,14 +140,10 @@ def get_dataset(experiment):
         component = experiment.replace('african_dialects_', '')
         df = df[(df['content_token_length'] > 10) & (df['CORAAL Component'] == component)]
 
-    elif experiment == 'english_accents':
-        df = pd.read_csv(storage_path + 'data/' + 'english_accents.csv')
 
-    elif 'british_dialects' in experiment:
+    else: 
         df = pd.read_csv(storage_path + 'data/' + experiment + '.csv')
 
-    elif 'synthetic' in experiment:
-        df = pd.read_csv(storage_path + 'data/' + experiment + '.csv')
 
     return df
 
@@ -164,12 +160,10 @@ def get_audio_data(experiment, processor, model_name_or_path):
             file_path =  storage_path + 'audio_african_dialects/' + row['Spkr'] + '_segment_' + str(row['segment'])  + '.wav'
         elif experiment == 'english_accents':
             file_path =  storage_path + 'recordings/' + row['filename'] + '.mp3'
-        elif 'british_dialects' in experiment:
-            #file_path =  storage_path + 'british_dialects_audio/' + experiment +'/'+ row['audio_file'] + '.wav'
-            file_path = row['audio_file']
-
         elif 'synthetic' in experiment:
             file_path =  storage_path + 'synthetic_audio/' + row['audio_file']
+        else: 
+            file_path = row['audio_file']
 
         audio_array = read_audio_file(model_name_or_path, file_path, processor)
             
@@ -301,7 +295,7 @@ def wrapper(task='profession_binary', **kwargs):
             main(task=t, **kwargs)
             logging.info(f'Task "{t}" finished in {time.time() - st:.2f} seconds')
     elif task == 'profession_compare':
-        task_list = [f'profession_compare_{i}' for i in range(42, len(PROFESSIONS['english']))]
+        task_list = [f'profession_compare_{i}' for i in range(len(PROFESSIONS['english']))]
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
             st = time.time()
