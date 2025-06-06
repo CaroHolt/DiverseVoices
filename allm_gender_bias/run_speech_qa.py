@@ -5,27 +5,24 @@ import librosa
 import torch
 from tqdm import tqdm
 import os
-import time 
 import fire
 import logging
 import soundfile as sf
 from prompts import *
 
 
-storage_path = '/work/bbc6523/diverse_voices/'
+storage_path = '/p/project1/westai0056/code/DiverseVoices/allm_gender_bias/'
 
-def load_model(model_name_or_path, cache_dir, load_in_8bit):
+def load_model(model_name_or_path, load_in_8bit):
     processor = AutoProcessor.from_pretrained(
             model_name_or_path, 
             trust_remote_code=True,
-            cache_dir = cache_dir
             )
     if 'Qwen' in model_name_or_path:
         model = Qwen2AudioForConditionalGeneration.from_pretrained(
             model_name_or_path,
             use_safetensors=True,
             trust_remote_code=True,
-            cache_dir = cache_dir,
             load_in_8bit=load_in_8bit
         )        
     elif 'Phi' in model_name_or_path:
@@ -34,14 +31,12 @@ def load_model(model_name_or_path, cache_dir, load_in_8bit):
             trust_remote_code=True,
             torch_dtype='auto',
             _attn_implementation='flash_attention_2',
-            cache_dir = cache_dir,
         )
     elif 'MERaLiON' in model_name_or_path:
         model = AutoModelForSpeechSeq2Seq.from_pretrained(
             model_name_or_path,
             use_safetensors=True,
             trust_remote_code=True,
-            cache_dir = cache_dir,
             load_in_8bit=load_in_8bit
         )
     elif 'typhoon' in model_name_or_path:    
@@ -49,7 +44,6 @@ def load_model(model_name_or_path, cache_dir, load_in_8bit):
             model_name_or_path,
             torch_dtype=torch.bfloat16,
             device_map="auto",
-            cache_dir = cache_dir
         )
     elif 'Step' in model_name_or_path:
         model = AutoModelForCausalLM.from_pretrained(
@@ -57,7 +51,6 @@ def load_model(model_name_or_path, cache_dir, load_in_8bit):
             torch_dtype=torch.bfloat16,
             device_map="auto",
             trust_remote_code=True,
-            cache_dir = cache_dir
         )
         processor = AutoTokenizer.from_pretrained(
             model_name_or_path, trust_remote_code=True
@@ -68,8 +61,8 @@ def load_model(model_name_or_path, cache_dir, load_in_8bit):
     return model, processor
     
 
-def get_query_list(task, model_name_or_path, processor, batch_size, ds_size):
-    query_list = create_prompts(task, 'english', 'audio', ds_size)
+def get_query_list(task, model_name_or_path, processor, df):
+    query_list = create_prompts(task, 'english', 'audio', len(df), df['gender'].tolist())
     chat_prompts = []
     if 'MERaLiON' in model_name_or_path:
         prompt = "Given the following audio context: <SpeechHere>\n\nText instruction: {query}"
@@ -179,8 +172,6 @@ def main(
 
         # model parameters
         model_name_or_path: str,
-
-        cache_dir:str,
           
         # quantization parameters
         load_in_8bit: bool,
@@ -192,12 +183,15 @@ def main(
 
         batch_size:int,
         seq_length:int
-
         ):
+        if 'Qwen' in model_name_or_path:
+            model_save_path = model_name_or_path
+            model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a'
+
 
         df = get_dataset(experiment)
 
-        model, processor = load_model(model_name_or_path, cache_dir, load_in_8bit)
+        model, processor = load_model(model_name_or_path, load_in_8bit)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if not load_in_8bit:
@@ -209,11 +203,10 @@ def main(
         if sample_size >0:
             audio_arrays = audio_arrays[:sample_size]
 
-        chat_prompts = get_query_list(task, model_name_or_path, processor, batch_size, len(audio_arrays))
+        chat_prompts = get_query_list(task, model_name_or_path, processor, df)
 
         print(len(chat_prompts))
         print(len(audio_arrays))
-
 
         results = []
 
@@ -261,68 +254,69 @@ def main(
         if sample_size > 0:
             print(results)
         else: 
-            output_file = output_path + str(model_name_or_path.split('/')[1]) + '.csv'
+            output_file = output_path + str(model_save_path.split('/')[1]) + '.csv'
+            print(output_file)
             if os.path.exists(output_file):
                 df = pd.read_csv(output_file)
 
-            if 'african_dialects' in experiment:
-                start_df = pd.read_csv('/work/bbc6523/diverse_voices/full_text_african_dialects.csv')
-                component = experiment.replace('african_dialects_', '')
-                start_df = start_df[(start_df['content_token_length'] > 10) & (start_df['CORAAL Component'] == component)]
-                df = pd.DataFrame({
-                    'Spkr': start_df['Spkr'].tolist(),
-                    'segment': start_df['segment'].tolist()
-                })
             df[f'model_response_{task}'] = results
             df[f'model_prompt_{task}'] = chat_prompts
             df.to_csv(output_file, index=False)
 
 
 def wrapper(task='profession_binary', **kwargs):
-    print(task)
     if task == 'profession_binary':
         task_list = [f'profession_binary_{i}' for i in range(22)]
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
-            st = time.time()
             main(task=t, **kwargs)
-            logging.info(f'Task "{t}" finished in {time.time() - st:.2f} seconds')
     elif task == 'adjective_binary':
         task_list = [f'adjective_binary_{i}' for i in range(22)]
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
-            st = time.time()
             main(task=t, **kwargs)
-            logging.info(f'Task "{t}" finished in {time.time() - st:.2f} seconds')
     elif task == 'profession_compare':
         task_list = [f'profession_compare_{i}' for i in range(len(PROFESSIONS['english']))]
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
-            st = time.time()
             main(task=t, **kwargs)
-            logging.info(f'Task "{t}" finished in {time.time() - st:.2f} seconds')
     elif task == 'profession_gender_compare':
         task_list = [f'profession_gender_compare_{i}' for i in range(len(PROFESSIONS_GENDER['english']))]
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
-            st = time.time()
             main(task=t, **kwargs)
-            logging.info(f'Task "{t}" finished in {time.time() - st:.2f} seconds')
     elif task == 'adjective_compare':
         for adj in ADJECTIVES.keys():
             task_list = [f'adjective_compare_{adj}_{i}' for i in range(len(ADJECTIVES[adj]))]
             for t in task_list:
                 print(f"\n=== Running task: {t} for adjective {adj} ===")
-                st = time.time()
                 main(task=t, **kwargs)
-                logging.info(f'Task "{t}" finished in {time.time() - st:.2f} seconds')
+
+    # ---
+    elif task == 'profession_salary':
+        task_list = [f'profession_salary_{i}' for i in PROFESSIONS_SUBSET['english']]
+        for t in task_list:
+            print(f"\n=== Running task: {t} ===")
+            main(task=t, **kwargs)
+    elif task == 'profession_salary_bio':
+        task_list = [f'profession_salary_bio_{i}' for i in PROFESSIONS_SUBSET['english']]
+        for t in task_list:
+            print(f"\n=== Running task: {t} ===")
+            main(task=t, **kwargs)
+    elif task == 'profession_salary_bio_wo_profession':
+        task_list = [f'profession_salary_bio_wo_profession']
+        for t in task_list:
+            print(f"\n=== Running task: {t} ===")
+            main(task=t, **kwargs)
+    elif task == "profession_choice_multi":
+        task_list = [f'profession_choice_{i}' for i in range(5)]
+        for t in task_list:
+            print(f"\n=== Running task: {t} ===")
+            main(task=t, **kwargs)
 
     else:
         main(task=task, **kwargs)
 
 
 if __name__ == "__main__":
-    st = time.time()
-
     fire.Fire(wrapper)
-    logging.info(f'Total execution time: {time.time() - st:.2f} seconds')
