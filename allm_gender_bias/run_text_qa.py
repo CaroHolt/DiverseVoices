@@ -44,16 +44,23 @@ def get_text_query_list(task, model_name_or_path, processor, batch_size, text_ar
 
 
 
-def get_text_data(experiment, model_name_or_path):
+def get_text_data(task, experiment, model_name_or_path):
     text_arrays = []
 
     df = get_dataset(experiment)
 
+    if "profession_binary_category_name_" in task:
+        female = "Emma: "
+        male = "John: "
+    else:
+        female = "Female Person: "
+        male = "Male Person: "
+
     for index, row in tqdm(df.iterrows()):
         if row["gender"] == "female":
-            gender = "Female Person: "
+            gender = female
         else:
-            gender = "Male Person: " 
+            gender = male
         text_arrays.append(gender +  str(row['text']) + "\n\n")
 
     return text_arrays
@@ -83,13 +90,14 @@ def main(
             model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a'
 
         model, processor = load_model(model_name_or_path, load_in_8bit)
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if not load_in_8bit:
             model.to(device)
         #model, processor = None, None
 
 
-        text_arrays = get_text_data(experiment, model_name_or_path)
+        text_arrays = get_text_data(task, experiment, model_name_or_path)
 
         if sample_size >0:
             text_arrays = text_arrays[:sample_size]
@@ -107,7 +115,7 @@ def main(
 
 
             if 'Qwen' in model_name_or_path:
-                inputs = processor(text=text_batch, padding=True, return_tensors="pt").to(device)
+                inputs = processor(text=text_batch, audios=None, padding=True, return_tensors="pt").to(device)
             elif 'MERaLiON' in model_name_or_path:
                 inputs = processor(text=text_batch).to(device)
             else:
@@ -162,6 +170,18 @@ def wrapper(task='profession_binary', **kwargs):
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
             main(task=t, **kwargs)
+    elif task == "profession_binary_category":
+        task_list = [f'profession_binary_category_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
+        for t in task_list:
+            print(f"\n=== Running task: {t} ===")
+            main(task=t, **kwargs)
+    elif task == "profession_binary_category_name":
+        task_list = [f'profession_binary_category_name_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
+        for t in task_list:
+            print(f"\n=== Running task: {t} ===")
+            main(task=t, **kwargs)
+
+
     else:
         main(task=task, **kwargs)
 

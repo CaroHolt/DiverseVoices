@@ -39,22 +39,6 @@ def load_model(model_name_or_path, load_in_8bit):
             trust_remote_code=True,
             load_in_8bit=load_in_8bit
         )
-    elif 'typhoon' in model_name_or_path:    
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
-            torch_dtype=torch.bfloat16,
-            device_map="auto",
-        )
-    elif 'Step' in model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
-            torch_dtype=torch.bfloat16,
-            device_map="auto",
-            trust_remote_code=True,
-        )
-        processor = AutoTokenizer.from_pretrained(
-            model_name_or_path, trust_remote_code=True
-        )
     else: 
         raise ValueError("No suitable model found")
     
@@ -64,7 +48,9 @@ def load_model(model_name_or_path, load_in_8bit):
 def get_query_list(task, model_name_or_path, processor, df):
     query_list = create_prompts(task, 'english', 'audio', len(df), df['gender'].tolist())
     chat_prompts = []
-    if 'MERaLiON' in model_name_or_path:
+    print(model_name_or_path)
+    print('CREATE PROMPTS')
+    if 'MERaLiON-AudioLLM' in model_name_or_path:
         prompt = "Given the following audio context: <SpeechHere>\n\nText instruction: {query}"
 
         for query in query_list:
@@ -78,9 +64,8 @@ def get_query_list(task, model_name_or_path, processor, df):
                 add_generation_prompt=True
             )
             chat_prompts.append(chat_prompt)
-
-    elif 'Phi' in model_name_or_path:
-        prompt = "<|audio_1|>{query}"
+    elif 'MERaLiON-2-10B' in model_name_or_path:
+        prompt = "Instruction: {query} \nFollow the text instruction based on the following audio: <SpeechHere>"
 
         for query in query_list:
             conversation = [
@@ -93,6 +78,7 @@ def get_query_list(task, model_name_or_path, processor, df):
                 add_generation_prompt=True
             )
             chat_prompts.append(chat_prompt)
+
 
     else:
         for query in query_list:
@@ -128,16 +114,8 @@ def read_audio_file(model_name_or_path, file_path, processor):
     return audio_array
 
 def get_dataset(experiment):
-    if 'african_dialects' in experiment:
-        df = pd.read_csv(storage_path + 'full_text_african_dialects.csv')
-        component = experiment.replace('african_dialects_', '')
-        df = df[(df['content_token_length'] > 10) & (df['CORAAL Component'] == component)]
 
-
-    else: 
-        df = pd.read_csv(storage_path + 'data/' + experiment + '.csv')
-
-
+    df = pd.read_csv(storage_path + 'data/' + experiment + '.csv')
     return df
 
 
@@ -149,14 +127,7 @@ def get_audio_data(experiment, processor, model_name_or_path):
 
     for index, row in tqdm(df.iterrows()):
         
-        if 'african_dialects' in experiment:
-            file_path =  storage_path + 'audio_african_dialects/' + row['Spkr'] + '_segment_' + str(row['segment'])  + '.wav'
-        elif experiment == 'english_accents':
-            file_path =  storage_path + 'recordings/' + row['filename'] + '.mp3'
-        elif 'synthetic' in experiment:
-            file_path =  storage_path + 'synthetic_audio/' + row['audio_file']
-        else: 
-            file_path = row['audio_file']
+        file_path = row['audio_file']
 
         audio_array = read_audio_file(model_name_or_path, file_path, processor)
             
@@ -187,7 +158,12 @@ def main(
         if 'Qwen' in model_name_or_path:
             model_save_path = model_name_or_path
             model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a'
-
+        if 'MERaLiON-AudioLLM-Whisper-SEA-LION' in model_name_or_path:
+            model_save_path = model_name_or_path
+            model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--MERaLiON--MERaLiON-AudioLLM-Whisper-SEA-LION/snapshots/e6d1803e9391090db5396465bd4712645a117cef'
+        if 'MERaLiON-2-10B' in model_name_or_path:
+            model_save_path = model_name_or_path
+            model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--MERaLiON--MERaLiON-2-10B/snapshots/31d5b7ac6a88652c934583311c40fa74b80b41ac'
 
         df = get_dataset(experiment)
 
@@ -205,7 +181,7 @@ def main(
 
         chat_prompts = get_query_list(task, model_name_or_path, processor, df)
 
-        print(len(chat_prompts))
+        print(chat_prompts[0])
         print(len(audio_arrays))
 
         results = []
@@ -228,19 +204,21 @@ def main(
                 with torch.no_grad():
                     outputs = model.generate(**inputs, 
                                             max_new_tokens=seq_length, 
-                                            do_sample=True, 
-                                            temperature=0.1, 
-                                            top_p=0.9, 
-                                            top_k=100,
+                                            do_sample=False, 
+                                            #do_sample=True, 
+                                            #temperature=0.1, 
+                                            #top_p=0.9, 
+                                            #top_k=100,
                                             num_logits_to_keep=1)
             else:
                 with torch.no_grad():
                     outputs = model.generate(**inputs, 
                                             max_new_tokens=seq_length, 
-                                            do_sample=True, 
-                                            temperature=0.1, 
-                                            top_p=0.9, 
-                                            top_k=100,
+                                            do_sample=False,
+                                            #do_sample=True, 
+                                            #temperature=0.1, 
+                                            #top_p=0.9, 
+                                            #top_k=100,
                                             )
             generated_ids = outputs[:, inputs['input_ids'].size(1):]
             responses = processor.batch_decode(generated_ids, skip_special_tokens=True)#[0]
@@ -270,8 +248,8 @@ def wrapper(task='profession_binary', **kwargs):
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
             main(task=t, **kwargs)
-    elif task == 'adjective_binary':
-        task_list = [f'adjective_binary_{i}' for i in range(22)]
+    elif task == 'adjectives_iat':
+        task_list = [f'adjectives_iat_{i}' for i in ADJECTIVES_IAT.keys()]
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
             main(task=t, **kwargs)
@@ -310,6 +288,11 @@ def wrapper(task='profession_binary', **kwargs):
             main(task=t, **kwargs)
     elif task == "profession_choice_multi":
         task_list = [f'profession_choice_{i}' for i in range(5)]
+        for t in task_list:
+            print(f"\n=== Running task: {t} ===")
+            main(task=t, **kwargs)
+    elif task == "profession_binary_category":
+        task_list = [f'profession_binary_category_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
         for t in task_list:
             print(f"\n=== Running task: {t} ===")
             main(task=t, **kwargs)
