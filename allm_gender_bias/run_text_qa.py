@@ -164,26 +164,22 @@ def main(
             df[f'model_prompt_{task}'] = chat_prompts
             df.to_csv(output_file, index=False)
 
-def wrapper(task='profession_binary', **kwargs):
+def wrapper(task='profession_binary', prompt_variations=True, **kwargs):
+    task_list = [task]
     if task == "profession_choice_multi":
         task_list = [f'profession_choice_{i}' for i in range(5)]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == "profession_binary_category":
         task_list = [f'profession_binary_category_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == "profession_binary_category_name":
         task_list = [f'profession_binary_category_name_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
 
+    # Add Prompt Variations
+    if prompt_variations:
+        task_list = [task + f"_prompt{i}" for task in task_list for i in range(3)]
 
-    else:
-        main(task=task, **kwargs)
+    for t in task_list:
+        print(f"\n=== Running task: {t} ===")
+        main(task=t, **kwargs)
 
 if __name__ == "__main__":
     fire.Fire(wrapper)

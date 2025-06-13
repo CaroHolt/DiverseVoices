@@ -168,7 +168,7 @@ def main(
         df = get_dataset(experiment)
 
         model, processor = load_model(model_name_or_path, load_in_8bit)
-
+        #model, processor = None, None
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if not load_in_8bit:
             model.to(device)
@@ -242,64 +242,41 @@ def main(
             df.to_csv(output_file, index=False)
 
 
-def wrapper(task='profession_binary', **kwargs):
+def wrapper(task='profession_binary', prompt_variations=True, **kwargs):
+    task_list = [task]
     if task == 'profession_binary':
         task_list = [f'profession_binary_{i}' for i in range(22)]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == 'adjectives_iat':
         task_list = [f'adjectives_iat_{i}' for i in ADJECTIVES_IAT.keys()]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == 'profession_compare':
         task_list = [f'profession_compare_{i}' for i in range(len(PROFESSIONS['english']))]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == 'profession_gender_compare':
         task_list = [f'profession_gender_compare_{i}' for i in range(len(PROFESSIONS_GENDER['english']))]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == 'adjective_compare':
+        task_list = []
         for adj in ADJECTIVES.keys():
-            task_list = [f'adjective_compare_{adj}_{i}' for i in range(len(ADJECTIVES[adj]))]
-            for t in task_list:
-                print(f"\n=== Running task: {t} for adjective {adj} ===")
-                main(task=t, **kwargs)
+            task_list += [f'adjective_compare_{adj}_{i}' for i in range(len(ADJECTIVES[adj]))]
 
     # ---
     elif task == 'profession_salary':
         task_list = [f'profession_salary_{i}' for i in PROFESSIONS_SUBSET['english']]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == 'profession_salary_bio':
         task_list = [f'profession_salary_bio_{i}' for i in PROFESSIONS_SUBSET['english']]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == 'profession_salary_bio_wo_profession':
         task_list = [f'profession_salary_bio_wo_profession']
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == "profession_choice_multi":
         task_list = [f'profession_choice_{i}' for i in range(5)]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
     elif task == "profession_binary_category":
         task_list = [f'profession_binary_category_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
-        for t in task_list:
-            print(f"\n=== Running task: {t} ===")
-            main(task=t, **kwargs)
 
-    else:
-        main(task=task, **kwargs)
 
+    # Add Prompt Variations
+    if prompt_variations:
+        task_list = [task + f"_prompt{i}" for task in task_list for i in range(3)]
+
+    for t in task_list:
+        print(f"\n=== Running task: {t} ===")
+        main(task=t, **kwargs)
 
 if __name__ == "__main__":
     fire.Fire(wrapper)
