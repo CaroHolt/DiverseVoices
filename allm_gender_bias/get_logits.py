@@ -1,5 +1,5 @@
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModel, AutoModelForSpeechSeq2Seq, AutoProcessor, Qwen2AudioForConditionalGeneration, AutoTokenizer, AutoModelForCausalLM#, Qwen2_5OmniModel
+from transformers import AutoModel, AutoModelForSpeechSeq2Seq, AutoProcessor, Qwen2AudioForConditionalGeneration, AutoTokenizer, AutoModelForCausalLM#, Qwen2_5OmniModel
 import pandas as pd
 import librosa
 import torch
@@ -9,6 +9,8 @@ import fire
 import logging
 import soundfile as sf
 from prompts import *
+import torch.nn.functional as F
+import numpy as np
 
 
 storage_path = '/p/project1/westai0056/code/DiverseVoices/allm_gender_bias/'
@@ -18,29 +20,13 @@ def load_model(model_name_or_path, load_in_8bit):
             model_name_or_path, 
             trust_remote_code=True,
             )
-    
-    if "Qwen2-7B-Instruct" in model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
-            use_safetensors=True,
-            trust_remote_code=True,
-            load_in_8bit=load_in_8bit
-        )
-        processor = AutoTokenizer.from_pretrained(model_name_or_path)
-    elif 'Qwen' in model_name_or_path:
+    if 'Qwen' in model_name_or_path:
         model = Qwen2AudioForConditionalGeneration.from_pretrained(
             model_name_or_path,
             use_safetensors=True,
             trust_remote_code=True,
             load_in_8bit=load_in_8bit
         )        
-    elif 'Phi' in model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
-            trust_remote_code=True,
-            torch_dtype='auto',
-            _attn_implementation='flash_attention_2',
-        )
     elif 'MERaLiON' in model_name_or_path:
         model = AutoModelForSpeechSeq2Seq.from_pretrained(
             model_name_or_path,
@@ -111,12 +97,7 @@ def get_query_list(task, model_name_or_path, processor, df):
 
 def read_audio_file(model_name_or_path, file_path, processor):
 
-    if 'Phi' in model_name_or_path:
-
-        audio_array = sf.read(file_path)
-    
-    else:
-        audio_array, sr = librosa.load(file_path, sr=processor.feature_extractor.sampling_rate)  
+    audio_array, sr = librosa.load(file_path, sr=processor.feature_extractor.sampling_rate)  
 
     return audio_array
 
@@ -130,15 +111,24 @@ def get_dataset(experiment):
 def get_audio_data(experiment, processor, model_name_or_path):
     audio_arrays = []
 
-    df = get_dataset(experiment)
+    if experiment == 'prior':
 
-    for index, row in tqdm(df.iterrows()):
-        
-        file_path = row['audio_file']
+        for audio in ['silence', 'random_noise']:
+            file_path = 'data/audio_files/'+ audio + '.wav'
+            audio_array = read_audio_file(model_name_or_path, file_path, processor)
+            audio_arrays.append(audio_array)
 
-        audio_array = read_audio_file(model_name_or_path, file_path, processor)
+    else:
+
+        df = get_dataset(experiment)
+
+        for index, row in tqdm(df.iterrows()):
             
-        audio_arrays.append(audio_array)
+            file_path = row['audio_file']
+
+            audio_array = read_audio_file(model_name_or_path, file_path, processor)
+                
+            audio_arrays.append(audio_array)
 
     return audio_arrays
 
@@ -162,9 +152,7 @@ def main(
         batch_size:int,
         seq_length:int
         ):
-
         print(model_name_or_path)
-        
         if 'Qwen' in model_name_or_path:
             model_save_path = model_name_or_path
             model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a'
@@ -175,13 +163,14 @@ def main(
             model_save_path = model_name_or_path
             model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--MERaLiON--MERaLiON-2-10B/snapshots/31d5b7ac6a88652c934583311c40fa74b80b41ac'
 
-        df = get_dataset(experiment)
-
-
-        #print(df.head())
+        if experiment == 'prior':
+            df = pd.DataFrame(np.nan, index=range(2), columns=["gender"])
+        else:
+            df = get_dataset(experiment)
+            
 
         model, processor = load_model(model_name_or_path, load_in_8bit)
-        #model, processor = None, None
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if not load_in_8bit:
             model.to(device)
@@ -190,20 +179,29 @@ def main(
 
 
         audio_arrays = get_audio_data(experiment, processor, model_name_or_path)
-
+        if 'gender' in task:
+            tokens_of_interest = ['male', 'female']# ['1', '2', '3', '4', '5', '6', '7', '8', '9']     
+        else:
+            tokens_of_interest = [inner_list for sublist in ADJECTIVES_IAT_SINGLETOKEN[task.replace('adjectives_list_iat_logits_', '')[:-8]] for inner_list in sublist]
+        tok_ids = [processor.tokenizer.encode(tok, add_special_tokens=False)[0]
+                for tok in tokens_of_interest]
+        
+        batch_size = 1
         if sample_size >0:
             audio_arrays = audio_arrays[:sample_size]
-        
-
         results = []
-
         for i in tqdm(range(0, len(audio_arrays), batch_size)):
+            
             audio_batch = audio_arrays[i:i + batch_size]
             text_batch = chat_prompts[i:i + batch_size]
+            #print('text')
+            #print(text_batch)
+            #print('audio')
+            #print(audio_batch)
 
 
             if 'Qwen' in model_name_or_path:
-                inputs = processor(text=text_batch, audios=audio_batch, sampling_rate=16_000, padding=True, return_tensors="pt").to(device)
+                inputs = processor(text=text_batch, audios=audio_batch, padding=True, return_tensors="pt").to(device)
             elif 'MERaLiON' in model_name_or_path:
                 inputs = processor(text=text_batch, audios=audio_batch).to(device)
             else:
@@ -212,63 +210,60 @@ def main(
 
             inputs['input_ids'] = inputs['input_ids'].to(device)
 
+
+            # Get the raw logits
             with torch.no_grad():
                 outputs = model.generate(**inputs, 
-                                        max_new_tokens=seq_length, 
-                                        do_sample=False,
-                                        #do_sample=True, 
-                                        #temperature=0.1, 
-                                        #top_p=0.9, 
-                                        #top_k=100,
-                                        )
-            generated_ids = outputs[:, inputs['input_ids'].size(1):]
-            responses = processor.batch_decode(generated_ids, skip_special_tokens=True)#[0]
-            results.extend(responses)
+                                    max_new_tokens=10, 
+                                    return_dict_in_generate=True,  
+                                    output_scores=True,            
+                                    do_sample=False                
+                                    )
+
+
+            full_response = processor.batch_decode(outputs.sequences, skip_special_tokens=True)
+            print('full response')
+            print(full_response)
+
+            result_dict = {}
+            logits = outputs.scores[0]
+            logits_cpu = logits[0].float().cpu()
+            probs  = torch.softmax(logits_cpu, dim=-1)
+            result_dict = {tok: probs[tid].item()          # <— .item() here
+                for tok, tid in zip(tokens_of_interest, tok_ids)}
+            results.append(result_dict)
+ 
+
+
+            # 5) free GPU memory for this step
+            del logits
+            torch.cuda.empty_cache()
+
 
         output_path = storage_path + 'output/' + experiment + '/'
         if not os.path.exists(output_path):
             os.makedirs(output_path)
 
-
+        print(results)
         if sample_size > 0:
             print(results)
         else: 
             output_file = output_path + str(model_save_path.split('/')[1]) + '.csv'
-            #print(output_file)
+            df[f'model_response_logits_{task}'] = results
             if os.path.exists(output_file):
-                df = pd.read_csv(output_file)
+                df_old = pd.read_csv(output_file)
+                df = pd.concat([df,df_old])
 
-            df[f'model_response_{task}'] = results
-            df[f'model_prompt_{task}'] = chat_prompts
+            
             df.to_csv(output_file, index=False)
 
 
-def wrapper(task='profession_binary', prompt_variations=True, **kwargs):
+def wrapper(task='trait_assignment', prompt_variations=True, **kwargs):
     task_list = [task]
-    if task == 'profession_binary':
-        task_list = [f'profession_binary_{i}' for i in range(22)]
-    elif task == 'adjectives_iat':
-        task_list = [f'adjectives_iat_{i}' for i in ADJECTIVES_IAT.keys()]
-    elif task == 'trait_assignment':
-        task_list = [f'trait_assignment_{i}' for i in ['confidence', 'dominance', 'femininity', 'likeability', 'masculinity', 'trustworthiness', 'warmth']] # TRAIT_LIST.keys()
-    elif task == 'profession_compare':
-        task_list = [f'profession_compare_{i}' for i in range(len(PROFESSIONS['english']))]
-    elif task == 'adjectives_binary':
-        task_list = [f'adjectives_binary_{i}' for i in range(len(ADJECTIVES_BINARY['english']))]
-    elif task == 'profession_gender_compare':
-        task_list = [f'profession_gender_compare_{i}' for i in range(len(PROFESSIONS_GENDER['english']))]
-
-    # ---
-    elif task == 'profession_salary':
-        task_list = [f'profession_salary_{i}' for i in PROFESSIONS_SUBSET['english']]
-    elif task == 'profession_salary_bio':
-        task_list = [f'profession_salary_bio_{i}' for i in PROFESSIONS_SUBSET['english']]
-    elif task == 'profession_salary_bio_wo_profession':
-        task_list = [f'profession_salary_bio_wo_profession']
-    elif task == "profession_choice_multi":
-        task_list = [f'profession_choice_{i}' for i in range(5)]
-    elif task == "profession_binary_category":
-        task_list = [f'profession_binary_category_{category}' for category in ['Management Occupations']]#PROFESSION_BINARY_CATEGORY.keys()]
+    if task == 'trait_assignment':
+        task_list = [f'trait_assignment_{i}' for i in ['confidence']] # TRAIT_LIST.keys()
+    elif task == 'adjectives_list_iat_logits':
+        task_list = [f'adjectives_list_iat_logits_{i}' for i in ADJECTIVES_IAT_SINGLETOKEN.keys()]
 
 
     # Add Prompt Variations
@@ -281,3 +276,31 @@ def wrapper(task='profession_binary', prompt_variations=True, **kwargs):
 
 if __name__ == "__main__":
     fire.Fire(wrapper)
+
+
+
+exit()
+for step, logits_gpu in enumerate(outputs.scores):
+    
+    logits = logits_gpu[0].float().cpu()
+
+
+    probs  = torch.softmax(logits, dim=-1)
+
+
+    
+    chosen_id   = generated_ids[prompt_len + step].item()
+    chosen_tok  = processor.decode([chosen_id])
+    print(chosen_tok)
+    if 'MERaLiON' in model_name_or_path:
+        result_dict = {tok: round(probs[tid].item(), 4)        
+            for tok, tid in zip(tokens_of_interest, tok_ids)}
+        results.append(result_dict)
+        break
+
+
+    if chosen_tok.lower().strip() in tokens_of_interest:
+        result_dict = {tok: round(probs[tid].item(), 4)        
+            for tok, tid in zip(tokens_of_interest, tok_ids)}
+        results.append(result_dict)
+        break

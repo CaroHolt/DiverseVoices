@@ -12,28 +12,58 @@ from prompts import *
 from run_speech_qa import get_dataset, load_model, storage_path
 
 
+
+FEMALE_NAMES = [
+    "Emma", "Sophia", "Olivia", "Isabella", "Ava",
+    "Emily", "Mia", "Abigail", "Charlotte", "Grace"
+]
+MALE_NAMES = [
+    "John", "James", "Michael", "William", "David",
+    "Robert", "Daniel", "Joseph", "Thomas", "Christopher"
+]
+
 def get_text_query_list(task, model_name_or_path, processor, batch_size, text_arrays):
     query_list = create_prompts(task, 'english', 'text', len(text_arrays), [])
     chat_prompts = []
-    if 'MERaLiON' in model_name_or_path:
-        asdsad
+    if 'MERaLiON-2-10B' in model_name_or_path:
+        prompt = "Instruction: {query} \nFollow the text instruction based on the following audio: <SpeechHere>"
+
+        for query in query_list:
+            conversation = [
+                {"role": "user", "content": prompt.format(query=query)}
+            ]
+            # Apply the chat template to create a prompt for the model
+            chat_prompt = processor.tokenizer.apply_chat_template(
+                conversation=conversation,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            chat_prompts.append(chat_prompt)
 
     elif 'Phi' in model_name_or_path:
         asdsad
 
     else:
         for index, query in enumerate(query_list):
-            conversation = [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Given the following text context: "},
-                        {"type": "text", "text": text_arrays[index]},
-                        {"type": "text", "text": query}
-                    ]
-                }
-            ]
+            if 'Qwen2-7B-Instruct' in model_name_or_path:
+                conversation = [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {
+                        "role": "user",
+                        "content": "Given the following text context: " + text_arrays[index] + query
+                    }
+                ]
+            else:
+                conversation = [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Given the following text context: " + text_arrays[index] + query},
+                        ]
+                    }
+                ]
+
             chat_prompt = processor.apply_chat_template(
                 conversation=conversation,
                 tokenize=False,
@@ -49,14 +79,14 @@ def get_text_data(task, experiment, model_name_or_path):
 
     df = get_dataset(experiment)
 
-    if "profession_binary_category_name_" in task:
-        female = "Emma: "
-        male = "John: "
-    else:
-        female = "Female Person: "
-        male = "Male Person: "
-
     for index, row in tqdm(df.iterrows()):
+        if "_name_" in task:
+            female = f"{random.choice(FEMALE_NAMES)}: "
+            male = f"{random.choice(MALE_NAMES)}: "
+        else:
+            female = "Female Person: "
+            male = "Male Person: "
+
         if row["gender"] == "female":
             gender = female
         else:
@@ -85,9 +115,17 @@ def main(
         batch_size:int,
         seq_length:int
         ):
-        if 'Qwen' in model_name_or_path:
+        if os.path.exists(model_name_or_path):
+            model_save_path = model_name_or_path
+        elif 'Qwen' in model_name_or_path:
             model_save_path = model_name_or_path
             model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a'
+        elif 'MERaLiON-AudioLLM-Whisper-SEA-LION' in model_name_or_path:
+            model_save_path = model_name_or_path
+            model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--MERaLiON--MERaLiON-AudioLLM-Whisper-SEA-LION/snapshots/e6d1803e9391090db5396465bd4712645a117cef'
+        elif 'MERaLiON-2-10B' in model_name_or_path:
+            model_save_path = model_name_or_path
+            model_name_or_path = '/p/project1/westai0056/code/cache_dir/models--MERaLiON--MERaLiON-2-10B/snapshots/31d5b7ac6a88652c934583311c40fa74b80b41ac'
 
         model, processor = load_model(model_name_or_path, load_in_8bit)
 
@@ -113,8 +151,9 @@ def main(
         for i in tqdm(range(0, len(chat_prompts), batch_size)):
             text_batch = chat_prompts[i:i + batch_size]
 
-
-            if 'Qwen' in model_name_or_path:
+            if 'Qwen2-7B-Instruct' in model_name_or_path:
+                inputs = processor(text=text_batch, padding=True, return_tensors="pt").to(device)
+            elif 'Qwen' in model_name_or_path:
                 inputs = processor(text=text_batch, audios=None, padding=True, return_tensors="pt").to(device)
             elif 'MERaLiON' in model_name_or_path:
                 inputs = processor(text=text_batch).to(device)
@@ -127,19 +166,13 @@ def main(
                 with torch.no_grad():
                     outputs = model.generate(**inputs, 
                                             max_new_tokens=seq_length, 
-                                            do_sample=True, 
-                                            temperature=0.1, 
-                                            top_p=0.9, 
-                                            top_k=100,
+                                            do_sample=False, 
                                             num_logits_to_keep=1)
             else:
                 with torch.no_grad():
                     outputs = model.generate(**inputs, 
                                             max_new_tokens=seq_length, 
-                                            do_sample=True, 
-                                            temperature=0.1, 
-                                            top_p=0.9, 
-                                            top_k=100,
+                                            do_sample=False,
                                             )
             generated_ids = outputs[:, inputs['input_ids'].size(1):]
             responses = processor.batch_decode(generated_ids, skip_special_tokens=True)#[0]
@@ -153,7 +186,7 @@ def main(
         if sample_size > 0:
             print(results)
         else: 
-            output_file = output_path + str(model_save_path.split('/')[1]) + '.csv'
+            output_file = output_path + str(model_save_path.split('/')[-1]) + '.csv'
             print(output_file)
             if os.path.exists(output_file):
                 df = pd.read_csv(output_file)
@@ -172,6 +205,10 @@ def wrapper(task='profession_binary', prompt_variations=True, **kwargs):
         task_list = [f'profession_binary_category_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
     elif task == "profession_binary_category_name":
         task_list = [f'profession_binary_category_name_{category}' for category in PROFESSION_BINARY_CATEGORY.keys()]
+    elif task == 'adjectives_iat':
+        task_list = [f'adjectives_iat_{i}' for i in ADJECTIVES_IAT.keys()]
+    elif task == 'adjectives_iat_name':
+        task_list = [f'adjectives_iat_name_{i}' for i in ADJECTIVES_IAT.keys()]
 
     # Add Prompt Variations
     if prompt_variations:
